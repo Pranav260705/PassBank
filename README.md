@@ -8,9 +8,6 @@ A secure password manager built with React and Vite.
 - Passwords are stored on a local backend (default: http://localhost:3000/)
 - Modern UI with Lordicon animated icons
 
-## Screenshots
-![Screenshot](screenshot.png)
-
 ## Getting Started
 
 ### Prerequisites
