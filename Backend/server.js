@@ -85,6 +85,8 @@ passport.deserializeUser(async (id, done) => {
 console.log('Setting up Google OAuth Strategy...');
 console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'Found' : 'Missing');
 console.log('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'Found' : 'Missing');
+console.log('GOOGLE_CALLBACK_URL:', process.env.GOOGLE_CALLBACK_URL || 'Using default localhost');
+console.log('CLIENT_URL:', process.env.CLIENT_URL || 'Using default localhost');
 
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
