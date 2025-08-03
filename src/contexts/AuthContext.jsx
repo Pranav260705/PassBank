@@ -13,18 +13,27 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authToken, setAuthToken] = useState(localStorage.getItem('authToken'));
 
   const checkAuthStatus = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       console.log('Frontend: Checking auth status at:', `${API_URL}/auth/user`);
       
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add token to headers if available
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+        console.log('Frontend: Using token for auth check');
+      }
+      
       const response = await fetch(`${API_URL}/auth/user`, {
         method: 'GET',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
       });
       const data = await response.json();
       
@@ -61,13 +70,29 @@ export const AuthProvider = ({ children }) => {
         },
       });
       setUser(null);
+      setAuthToken(null);
+      localStorage.removeItem('authToken');
     } catch (error) {
-      console.error('Error logging out:', error);
+      console.error('Frontend: Error logging out:', error);
     }
   };
 
   useEffect(() => {
     console.log('Frontend: AuthContext mounted, checking auth status...');
+    
+    // Check for token in URL (from OAuth redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
+    
+    if (tokenFromUrl) {
+      console.log('Frontend: Found token in URL, storing it...');
+      localStorage.setItem('authToken', tokenFromUrl);
+      setAuthToken(tokenFromUrl);
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
     checkAuthStatus();
   }, []);
 
@@ -79,7 +104,7 @@ export const AuthProvider = ({ children }) => {
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [authToken]); // Re-run when authToken changes
 
   const value = {
     user,

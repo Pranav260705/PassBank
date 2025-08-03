@@ -37,8 +37,7 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     httpOnly: true,
-    path: '/',
-    domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
+    path: '/'
   }
 }))
 
@@ -138,27 +137,24 @@ app.get('/auth/google/callback',
     console.log('Session ID:', req.sessionID);
     console.log('Session data:', req.session);
     console.log('Is authenticated:', req.isAuthenticated());
-    console.log('Redirecting to:', process.env.CLIENT_URL || 'http://localhost:5173');
     
-    // Force session save before redirect
-    req.session.save((err) => {
-      if (err) {
-        console.error('Session save error:', err);
-      } else {
-        console.log('Session saved successfully');
-        
-        // Manually set the session cookie for cross-domain
-        if (process.env.NODE_ENV === 'production') {
-          res.cookie('passbank-session', req.sessionID, {
-            secure: true,
-            sameSite: 'none',
-            maxAge: 24 * 60 * 60 * 1000,
-            domain: '.onrender.com'
-          });
-        }
-      }
+    if (req.user) {
+      // Create a simple token (in production, use JWT)
+      const token = Buffer.from(req.user.googleId + ':' + Date.now()).toString('base64');
+      
+      // Store token in session for validation
+      req.session.authToken = token;
+      req.session.userId = req.user.googleId;
+      
+      console.log('Generated token:', token);
+      console.log('Redirecting to:', process.env.CLIENT_URL || 'http://localhost:5173');
+      
+      // Redirect with token as URL parameter
+      const redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}?token=${token}`;
+      res.redirect(redirectUrl);
+    } else {
       res.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
-    });
+    }
   }
 );
 
@@ -178,6 +174,40 @@ app.get('/auth/user', (req, res) => {
   console.log('Auth check - Cookies:', req.headers.cookie);
   console.log('Auth check - Session data:', req.session);
   
+  // Check for token in Authorization header
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    console.log('Token from header:', token);
+    
+    // Validate token against session
+    if (req.session.authToken === token && req.session.userId) {
+      // Find user by userId
+      const collection = db.collection('users');
+      collection.findOne({ googleId: req.session.userId }).then(user => {
+        if (user) {
+          res.json({ 
+            user: user,
+            isAuthenticated: true 
+          });
+        } else {
+          res.json({ 
+            user: null,
+            isAuthenticated: false 
+          });
+        }
+      }).catch(err => {
+        console.error('Error finding user:', err);
+        res.json({ 
+          user: null,
+          isAuthenticated: false 
+        });
+      });
+      return;
+    }
+  }
+  
+  // Fallback to session-based auth
   if (req.isAuthenticated()) {
     res.json({ 
       user: req.user,
