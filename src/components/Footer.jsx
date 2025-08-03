@@ -13,7 +13,7 @@ const Footer = () => {
           <p className="pt-1">Contribute on</p>
           <button>
             <a
-              href="https://www.github.com"
+              href="https://github.com/Pranav260705/PassBank"
               target="_blank"
               rel="noopener noreferrer"
             >
