@@ -18,7 +18,8 @@ const Manager = () => {
     password: "",
   });
   const getData = async () => {
-    let req = await fetch("http://localhost:3000/api/logins", {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    let req = await fetch(`${API_URL}/api/logins`, {
       credentials: 'include'
     });
     let data = await req.json();
@@ -62,9 +63,10 @@ const Manager = () => {
     // Update UI
     setloginData([...loginData.filter((e) => e.id !== entry.id), entry]);
 
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     if (form.id) {
       // Update existing
-      await fetch(`http://localhost:3000/api/logins/${entry.id}`, {
+      await fetch(`${API_URL}/api/logins/${entry.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
@@ -72,7 +74,7 @@ const Manager = () => {
       });
     } else {
       // Insert new
-      await fetch("http://localhost:3000/api/logins", {
+      await fetch(`${API_URL}/api/logins`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
@@ -87,7 +89,8 @@ const Manager = () => {
     const item = loginData[index];
 
     // Delete from server
-    await fetch(`http://localhost:3000/api/logins/${item.id}`, {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    await fetch(`${API_URL}/api/logins/${item.id}`, {
       method: "DELETE",
       credentials: 'include',
     });

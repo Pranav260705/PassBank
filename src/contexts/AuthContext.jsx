@@ -16,7 +16,8 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('http://localhost:3000/auth/user', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_URL}/auth/user`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -39,12 +40,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = () => {
-    window.location.href = 'http://localhost:3000/auth/google';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    window.location.href = `${API_URL}/auth/google`;
   };
 
   const logout = async () => {
     try {
-      await fetch('http://localhost:3000/auth/logout', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      await fetch(`${API_URL}/auth/logout`, {
         method: 'GET',
         credentials: 'include',
         headers: {

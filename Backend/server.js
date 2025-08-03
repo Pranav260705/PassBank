@@ -10,7 +10,7 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy
 const port = process.env.PORT || 3000
 
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -25,14 +25,15 @@ dotenv.config()
 
 app.use(bodyparser.json())
 
-// Session configuration+
+// Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
-    maxAge: 24 * 60 * 60 * 1000
+    secure: process.env.NODE_ENV === 'production', // true in production (HTTPS)
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
   }
 }))
 
@@ -88,7 +89,7 @@ console.log('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'Found' 
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "http://localhost:3000/auth/google/callback"
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/auth/google/callback"
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -204,6 +205,6 @@ app.put('/api/logins/:id', isAuthenticated, async (req, res) => {
 });
 
 // Start server
-app.listen(3000, () => {
-    console.log(`Server listening on http://localhost:${port}`)
+app.listen(port, () => {
+    console.log(`Server listening on port ${port}`)
 })
