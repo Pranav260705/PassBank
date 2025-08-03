@@ -6,7 +6,6 @@ const cors = require('cors')
 const bodyparser = require('body-parser')
 const session = require('express-session')
 const passport = require('passport')
-const { redirect } = require('react-router-dom')
 const GoogleStrategy = require('passport-google-oauth20').Strategy
 const port = process.env.PORT || 3000
 
