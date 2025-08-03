@@ -18,7 +18,6 @@ export const AuthProvider = ({ children }) => {
   const checkAuthStatus = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      console.log('Frontend: Checking auth status at:', `${API_URL}/auth/user`);
       
       const headers = {
         'Content-Type': 'application/json',
@@ -27,7 +26,6 @@ export const AuthProvider = ({ children }) => {
       // Add token to headers if available
       if (authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
-        console.log('Frontend: Using token for auth check');
       }
       
       const response = await fetch(`${API_URL}/auth/user`, {
@@ -37,10 +35,8 @@ export const AuthProvider = ({ children }) => {
       });
       const data = await response.json();
       
-      console.log('Frontend: Auth response:', data);
       
       if (data.isAuthenticated) {
-        console.log('Frontend: User authenticated:', data.user);
         setUser(data.user);
       } else {
         console.log('Frontend: User not authenticated');

@@ -126,18 +126,14 @@ passport.use(new GoogleStrategy({
 
 // Auth routes
 app.get('/auth/google', (req, res, next) => {
-  console.log('OAuth initiation - Session ID:', req.sessionID);
-  console.log('OAuth initiation - Callback URL:', process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/auth/google/callback");
+
   next();
 }, passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
-    console.log('OAuth callback successful, user:', req.user ? req.user.email : 'No user');
-    console.log('Session ID:', req.sessionID);
-    console.log('Session data:', req.session);
-    console.log('Is authenticated:', req.isAuthenticated());
+    
     
     if (req.user) {
       // Create a simple token (in production, use JWT)
@@ -147,8 +143,6 @@ app.get('/auth/google/callback',
       req.session.authToken = token;
       req.session.userId = req.user.googleId;
       
-      console.log('Generated token:', token);
-      console.log('Redirecting to:', process.env.CLIENT_URL || 'http://localhost:5173');
       
       // Redirect with token as URL parameter
       const redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}?token=${token}`;
@@ -169,17 +163,11 @@ app.get('/auth/logout', (req, res) => {
 });
 
 app.get('/auth/user', (req, res) => {
-  console.log('Auth check - Session ID:', req.sessionID);
-  console.log('Auth check - Is authenticated:', req.isAuthenticated());
-  console.log('Auth check - User:', req.user ? req.user.email : 'No user');
-  console.log('Auth check - Cookies:', req.headers.cookie);
-  console.log('Auth check - Session data:', req.session);
   
   // Check for token in Authorization header
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
-    console.log('Token from header:', token);
     
     // Validate token against session
     if (req.session.authToken === token && req.session.userId) {
@@ -224,8 +212,6 @@ app.get('/auth/user', (req, res) => {
 
 // Test endpoint to check session functionality
 app.get('/auth/test-session', (req, res) => {
-  console.log('Test session - Session ID:', req.sessionID);
-  console.log('Test session - Cookies:', req.headers.cookie);
   
   if (!req.session.testCount) {
     req.session.testCount = 1;
