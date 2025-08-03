@@ -13,7 +13,8 @@ app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['Set-Cookie']
 }));
 
 // Load environment variables
@@ -36,7 +37,8 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     httpOnly: true,
-    path: '/'
+    path: '/',
+    domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
   }
 }))
 
@@ -123,9 +125,11 @@ passport.use(new GoogleStrategy({
 ));
 
 // Auth routes
-app.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+app.get('/auth/google', (req, res, next) => {
+  console.log('OAuth initiation - Session ID:', req.sessionID);
+  console.log('OAuth initiation - Callback URL:', process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/auth/google/callback");
+  next();
+}, passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
@@ -142,6 +146,16 @@ app.get('/auth/google/callback',
         console.error('Session save error:', err);
       } else {
         console.log('Session saved successfully');
+        
+        // Manually set the session cookie for cross-domain
+        if (process.env.NODE_ENV === 'production') {
+          res.cookie('passbank-session', req.sessionID, {
+            secure: true,
+            sameSite: 'none',
+            maxAge: 24 * 60 * 60 * 1000,
+            domain: '.onrender.com'
+          });
+        }
       }
       res.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
     });
