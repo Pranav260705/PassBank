@@ -3,17 +3,40 @@ import './App.css'
 import Navbar from './components/Navbar'
 import Manager from './components/Manager'
 import Footer from './components/Footer'
+import Login from './components/Login'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 
-function App() {
+function AppContent() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Login />
+  }
 
   return (
     <>
-      <Navbar></Navbar>
+      <Navbar />
       <div className='min-h-[88vh]'>
-      <Manager></Manager>
+        <Manager />
       </div>
-      <Footer></Footer>
+      <Footer />
     </>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
 

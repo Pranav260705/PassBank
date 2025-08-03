@@ -18,7 +18,9 @@ const Manager = () => {
     password: "",
   });
   const getData = async () => {
-    let req = await fetch("http://localhost:3000/");
+    let req = await fetch("http://localhost:3000/api/logins", {
+      credentials: 'include'
+    });
     let data = await req.json();
     if (data) {
       setloginData(data);
@@ -62,16 +64,18 @@ const Manager = () => {
 
     if (form.id) {
       // Update existing
-      await fetch(`http://localhost:3000/${entry.id}`, {
+      await fetch(`http://localhost:3000/api/logins/${entry.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',
         body: JSON.stringify(entry),
       });
     } else {
       // Insert new
-      await fetch("http://localhost:3000/", {
+      await fetch("http://localhost:3000/api/logins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',
         body: JSON.stringify([entry]),
       });
     }
@@ -83,8 +87,9 @@ const Manager = () => {
     const item = loginData[index];
 
     // Delete from server
-    await fetch(`http://localhost:3000/${item.id}`, {
+    await fetch(`http://localhost:3000/api/logins/${item.id}`, {
       method: "DELETE",
+      credentials: 'include',
     });
 
     // Update local state

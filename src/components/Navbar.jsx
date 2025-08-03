@@ -1,24 +1,43 @@
 import React from 'react'
+import { useAuth } from '../contexts/AuthContext'
 
 const Navbar = () => {
-  return (
-    <nav className='bg-slate-800 text-white '>
-            <div className="mycontainer flex justify-between items-center px-4 py-5 h-14">
+  const { user, logout } = useAuth()
 
-                <div className="logo font-bold text-white text-2xl">
-                    <span className='text-blue-500'> &lt;</span>
-                    <span>Pass</span><span className='text-blue-500'>Bank/&gt;</span>
-                </div>
-                {/* <ul>
-                    <li className='flex gap-4 '>
-                        <a className='hover:font-bold' href='/'>Home</a>
-                        <a className='hover:font-bold' href='#'>About</a>
-                        <a className='hover:font-bold' href='#'>Contact</a>
-                    </li>
-                </ul> */}
-                
+  const handleLogout = async () => {
+    await logout()
+  }
+
+  return (
+    <nav className='bg-slate-800 text-white'>
+      <div className="mycontainer flex justify-between items-center px-4 py-5 h-14">
+        <div className="logo font-bold text-white text-2xl">
+          <span className='text-blue-500'> &lt;</span>
+          <span>Pass</span><span className='text-blue-500'>Bank/&gt;</span>
+        </div>
+        
+        {user && (
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              {user.picture && (
+                <img 
+                  src={user.picture} 
+                  alt={user.name} 
+                  className="w-8 h-8 rounded-full"
+                />
+              )}
+              <span className="text-sm font-medium">{user.name}</span>
             </div>
-        </nav>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+        )}
+      </div>
+    </nav>
   )
 }
 
