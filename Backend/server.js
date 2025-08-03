@@ -25,6 +25,7 @@ dotenv.config()
 
 
 app.use(bodyparser.json())
+app.set('trust proxy', 1);
 
 // Session configuration
 app.use(session({
