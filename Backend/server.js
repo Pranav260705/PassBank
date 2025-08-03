@@ -30,11 +30,13 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
+  name: 'passbank-session',
   cookie: {
     secure: process.env.NODE_ENV === 'production', // true in production (HTTPS)
     maxAge: 24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    httpOnly: true
+    httpOnly: true,
+    path: '/'
   }
 }))
 
@@ -130,8 +132,19 @@ app.get('/auth/google/callback',
   (req, res) => {
     console.log('OAuth callback successful, user:', req.user ? req.user.email : 'No user');
     console.log('Session ID:', req.sessionID);
+    console.log('Session data:', req.session);
+    console.log('Is authenticated:', req.isAuthenticated());
     console.log('Redirecting to:', process.env.CLIENT_URL || 'http://localhost:5173');
-    res.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
+    
+    // Force session save before redirect
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+      } else {
+        console.log('Session saved successfully');
+      }
+      res.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
+    });
   }
 );
 
@@ -148,6 +161,8 @@ app.get('/auth/user', (req, res) => {
   console.log('Auth check - Session ID:', req.sessionID);
   console.log('Auth check - Is authenticated:', req.isAuthenticated());
   console.log('Auth check - User:', req.user ? req.user.email : 'No user');
+  console.log('Auth check - Cookies:', req.headers.cookie);
+  console.log('Auth check - Session data:', req.session);
   
   if (req.isAuthenticated()) {
     res.json({ 
@@ -160,6 +175,24 @@ app.get('/auth/user', (req, res) => {
       isAuthenticated: false 
     });
   }
+});
+
+// Test endpoint to check session functionality
+app.get('/auth/test-session', (req, res) => {
+  console.log('Test session - Session ID:', req.sessionID);
+  console.log('Test session - Cookies:', req.headers.cookie);
+  
+  if (!req.session.testCount) {
+    req.session.testCount = 1;
+  } else {
+    req.session.testCount++;
+  }
+  
+  res.json({ 
+    sessionId: req.sessionID,
+    testCount: req.session.testCount,
+    cookies: req.headers.cookie
+  });
 });
 
 // Protected route middleware
