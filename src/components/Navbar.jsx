@@ -2,7 +2,7 @@ import React from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 const Navbar = () => {
-  const { user, logout } = useAuth()
+  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout()
@@ -19,13 +19,11 @@ const Navbar = () => {
         {user && (
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              {user.picture && (
                 <img 
-                  src={user.picture} 
-                  alt={user.name} 
+                  src={user.picture}
+                  referrerPolicy='no-referrer' 
                   className="w-8 h-8 rounded-full"
                 />
-              )}
               <span className="text-sm font-medium">{user.name}</span>
             </div>
             <button
