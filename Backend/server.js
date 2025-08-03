@@ -33,7 +33,8 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production', // true in production (HTTPS)
     maxAge: 24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    httpOnly: true
   }
 }))
 
@@ -127,6 +128,9 @@ app.get('/auth/google',
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
+    console.log('OAuth callback successful, user:', req.user ? req.user.email : 'No user');
+    console.log('Session ID:', req.sessionID);
+    console.log('Redirecting to:', process.env.CLIENT_URL || 'http://localhost:5173');
     res.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
   }
 );
@@ -141,6 +145,10 @@ app.get('/auth/logout', (req, res) => {
 });
 
 app.get('/auth/user', (req, res) => {
+  console.log('Auth check - Session ID:', req.sessionID);
+  console.log('Auth check - Is authenticated:', req.isAuthenticated());
+  console.log('Auth check - User:', req.user ? req.user.email : 'No user');
+  
   if (req.isAuthenticated()) {
     res.json({ 
       user: req.user,
