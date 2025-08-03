@@ -4,6 +4,7 @@ A secure password manager built with React and Vite.
 
 ## Features
 - Add, edit, and delete login credentials (site, username, password)
+<<<<<<< HEAD
 - Copy site, username, or password to clipboard
 - Passwords are stored on a local backend (default: http://localhost:3000/)
 - Modern UI with Lordicon animated icons
@@ -17,6 +18,18 @@ A secure password manager built with React and Vite.
 - [Node.js](https://nodejs.org/) (v16 or higher recommended)
 - [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
 
+=======
+- Copy site, username, or password to the clipboard
+- Passwords are stored on a local backend (default: http://localhost:3000/)
+- Modern UI with Lordicon animated icons
+
+## Getting Started
+
+### Prerequisites
+- [Node.js](https://nodejs.org/) (v16 or higher recommended)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+
+>>>>>>> fc6a85210fcb7d8cf5bd9db2975e091f1251ba9c
 ### Installation
 1. Clone the repository:
    ```sh
@@ -29,6 +42,7 @@ A secure password manager built with React and Vite.
    # or
    yarn install
    ```
+<<<<<<< HEAD
 3. Create a `.env` file in the project root with the following content:
    ```env
    VITE_LORDICON_EDIT="https://cdn.lordicon.com/exymduqj.json"
@@ -36,6 +50,8 @@ A secure password manager built with React and Vite.
    VITE_LORDICON_COPY="https://cdn.lordicon.com/fjvfsqea.json"
    VITE_LORDICON_ADD="https://cdn.lordicon.com/rxgzsafd.json"
    ```
+=======
+>>>>>>> fc6a85210fcb7d8cf5bd9db2975e091f1251ba9c
 
 ### Running the App
 Start the development server:
