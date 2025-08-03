@@ -9,9 +9,6 @@ A secure password manager built with React and Vite.
 - Passwords are stored on a local backend (default: http://localhost:3000/)
 - Modern UI with Lordicon animated icons
 
-## Screenshots
-![Screenshot](screenshot.png)
-
 ## Getting Started
 
 ### Prerequisites
@@ -33,7 +30,7 @@ A secure password manager built with React and Vite.
 ### Installation
 1. Clone the repository:
    ```sh
-   git clone https://github.com/YOUR-USERNAME/YOUR-REPO.git
+   git clone https://github.com/Pranav260705/PassBank.git
    cd YOUR-REPO
    ```
 2. Install dependencies:
@@ -42,16 +39,7 @@ A secure password manager built with React and Vite.
    # or
    yarn install
    ```
-<<<<<<< HEAD
-3. Create a `.env` file in the project root with the following content:
-   ```env
-   VITE_LORDICON_EDIT="https://cdn.lordicon.com/exymduqj.json"
-   VITE_LORDICON_DELETE="https://cdn.lordicon.com/xyfswyxf.json"
-   VITE_LORDICON_COPY="https://cdn.lordicon.com/fjvfsqea.json"
-   VITE_LORDICON_ADD="https://cdn.lordicon.com/rxgzsafd.json"
-   ```
-=======
->>>>>>> fc6a85210fcb7d8cf5bd9db2975e091f1251ba9c
+
 
 ### Running the App
 Start the development server:
@@ -78,7 +66,6 @@ Create a `db.json` file in your project root with:
 
 ## Environment Variables
 - All Lordicon URLs are stored in the `.env` file and loaded via Vite.
-- **Never commit your `.env` file if it contains sensitive data.**
 
 ## License
 MIT
