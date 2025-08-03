@@ -17,6 +17,8 @@ export const AuthProvider = ({ children }) => {
   const checkAuthStatus = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      console.log('Frontend: Checking auth status at:', `${API_URL}/auth/user`);
+      
       const response = await fetch(`${API_URL}/auth/user`, {
         method: 'GET',
         credentials: 'include',
@@ -26,13 +28,17 @@ export const AuthProvider = ({ children }) => {
       });
       const data = await response.json();
       
+      console.log('Frontend: Auth response:', data);
+      
       if (data.isAuthenticated) {
+        console.log('Frontend: User authenticated:', data.user);
         setUser(data.user);
       } else {
+        console.log('Frontend: User not authenticated');
         setUser(null);
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      console.error('Frontend: Error checking auth status:', error);
       setUser(null);
     } finally {
       setLoading(false);
@@ -61,7 +67,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    console.log('Frontend: AuthContext mounted, checking auth status...');
     checkAuthStatus();
+  }, []);
+
+  // Check auth status again after a short delay to handle OAuth redirects
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log('Frontend: Delayed auth check after OAuth redirect...');
+      checkAuthStatus();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const value = {
