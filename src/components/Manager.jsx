@@ -57,7 +57,52 @@ const Manager = () => {
     }
   };
 
+  function isValidURL(input) {
+    if (!input || typeof input !== "string") return false;
+
+    try {
+      // Add scheme if missing
+      const url = new URL(
+        /^https?:\/\//i.test(input) ? input : "http://" + input
+      );
+
+      // Ensure it has at least a domain + TLD
+      return (
+        !!url.hostname &&
+        url.hostname.includes(".") &&
+        url.hostname.split(".").every((part) => part.length > 0)
+      );
+    } catch {
+      return false;
+    }
+  }
+
   const savePassword = async () => {
+    if (form.site == "" || form.username == "" || form.password == "") {
+      toast.error("Please fill all the fields!", {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: true,
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+      return;
+    } else if (!isValidURL(form.site)) {
+      toast.error("Please enter a valid URL!", {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: true,
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+      return;
+    }
     const entry = form.id ? form : { ...form, id: uuidv4() };
 
     // Update UI
@@ -146,7 +191,7 @@ const Manager = () => {
           <input
             className="bg-slate-800 rounded-full border border-blue-500 w-full px-4 py-1"
             onChange={handleChange}
-            type="text"
+            type="url"
             value={form.site}
             name="site"
             id=""
@@ -206,112 +251,115 @@ const Manager = () => {
             <h2 className="text-white font-bold text-xl py-3">
               Your Passwords
             </h2>
-            <table className="table-auto w-full rounded-md overflow-hidden">
-              <thead className=" bg-blue-800 text-white">
-                <tr>
-                  <th>Site</th>
-                  <th>Username</th>
-                  <th>Password</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-blue-900/10 text-white ">
-                {loginData.map((item, index) => {
-                  return (
-                    <tr key={index}>
-                      <td className="py-2 text-center ">
-                        <div className="flex items-center justify-center">
-                          <a href={item.site}>{item.site}</a>
-                          <div
-                            className="loridconcpy size-7 cursor-pointer"
-                            onClick={() => {
-                              copyText(item.site);
-                            }}
-                          >
-                            <lord-icon
-                              className="edit"
-                              src={LORDICON_COPY}
-                              trigger="hover"
-                              colors="primary:#ffffff,secondary:#ffffff"
-                            ></lord-icon>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2 text-center ">
-                        <div className="flex items-center justify-center">
-                          <a href={item.site}>{item.username}</a>
-                          <div
-                            className="loridconcpy size-7 cursor-pointer"
-                            onClick={() => {
-                              copyText(item.username);
-                            }}
-                          >
-                            <lord-icon
-                              className="edit"
-                              src={LORDICON_COPY}
-                              trigger="hover"
-                              colors="primary:#ffffff,secondary:#ffffff"
-                            ></lord-icon>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2 text-center ">
-                        <div className="flex items-center justify-center">
-                          <a href={item.site}>{item.password}</a>
-                          <div
-                            className="loridconcpy size-7 cursor-pointer"
-                            onClick={() => {
-                              copyText(item.password);
-                            }}
-                          >
-                            <lord-icon
-                              className="edit" 
-                              src={LORDICON_COPY}
-                              trigger="hover"
-                              colors="primary:#ffffff,secondary:#ffffff"
-                            ></lord-icon>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <div>
-                            <button
-                              className="cursor-pointer"
+            
+            <div className="max-h-90 rounded-md no-scrollbar overflow-y-auto">
+              <table className="table-auto w-full rounded-md">
+                <thead className=" bg-blue-800 text-white sticky top-0  z-10">
+                  <tr>
+                    <th>Site</th>
+                    <th>Username</th>
+                    <th>Password</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-blue-900/10 text-white">
+                  {loginData.map((item, index) => {
+                    return (
+                      <tr key={index}>
+                        <td className="py-2 text-center ">
+                          <div className="flex items-center justify-center">
+                            <a href={item.site}>{item.site}</a>
+                            <div
+                              className="loridconcpy size-7 cursor-pointer"
                               onClick={() => {
-                                deletePassword(index);
+                                copyText(item.site);
                               }}
                             >
                               <lord-icon
-                                className="delete"
-                                src={LORDICON_DELETE}
-                                trigger="hover"
-                                colors="primary:#ffffff"
-                              ></lord-icon>
-                            </button>
-                          </div>
-                          <div>
-                            <button
-                              className="cursor-pointer"
-                              onClick={() => {
-                                editPassword(index);
-                              }}
-                            >
-                              <lord-icon
-                                className="editIcon"
-                                src={LORDICON_EDIT}
+                                className="edit"
+                                src={LORDICON_COPY}
                                 trigger="hover"
                                 colors="primary:#ffffff,secondary:#ffffff"
                               ></lord-icon>
-                            </button>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="py-2 text-center ">
+                          <div className="flex items-center justify-center">
+                            <a href={item.site}>{item.username}</a>
+                            <div
+                              className="loridconcpy size-7 cursor-pointer"
+                              onClick={() => {
+                                copyText(item.username);
+                              }}
+                            >
+                              <lord-icon
+                                className="edit"
+                                src={LORDICON_COPY}
+                                trigger="hover"
+                                colors="primary:#ffffff,secondary:#ffffff"
+                              ></lord-icon>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2 text-center ">
+                          <div className="flex items-center justify-center">
+                            <a href={item.site}>{item.password}</a>
+                            <div
+                              className="loridconcpy size-7 cursor-pointer"
+                              onClick={() => {
+                                copyText(item.password);
+                              }}
+                            >
+                              <lord-icon
+                                className="edit"
+                                src={LORDICON_COPY}
+                                trigger="hover"
+                                colors="primary:#ffffff,secondary:#ffffff"
+                              ></lord-icon>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <div>
+                              <button
+                                className="cursor-pointer"
+                                onClick={() => {
+                                  deletePassword(index);
+                                }}
+                              >
+                                <lord-icon
+                                  className="delete"
+                                  src={LORDICON_DELETE}
+                                  trigger="hover"
+                                  colors="primary:#ffffff"
+                                ></lord-icon>
+                              </button>
+                            </div>
+                            <div>
+                              <button
+                                className="cursor-pointer"
+                                onClick={() => {
+                                  editPassword(index);
+                                }}
+                              >
+                                <lord-icon
+                                  className="editIcon"
+                                  src={LORDICON_EDIT}
+                                  trigger="hover"
+                                  colors="primary:#ffffff,secondary:#ffffff"
+                                ></lord-icon>
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

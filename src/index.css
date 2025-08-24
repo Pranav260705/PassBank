@@ -1,11 +1,22 @@
 @import "tailwindcss";
 
 body{
-  overflow:hidden
+  overflow: hidden;
 }
 
 @layer components{
   .mycontainer{
     @apply container px-40 py-16 mx-auto;
   }
+
+  .no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
+
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+}
+
