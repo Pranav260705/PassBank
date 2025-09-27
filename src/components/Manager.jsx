@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import { v4 as uuidv4 } from "uuid";
+import DocumentUpload from "./DocumentUpload";
 
 const LORDICON_ADD = import.meta.env.VITE_LORDICON_ADD;
 const LORDICON_COPY = import.meta.env.VITE_LORDICON_COPY;
@@ -10,6 +11,7 @@ const LORDICON_EDIT = import.meta.env.VITE_LORDICON_EDIT;
 const Manager = () => {
   const ref = useRef();
   const passwordRef = useRef();
+  const [activeTab, setActiveTab] = useState('passwords');
 
   const [form, setform] = useState({
     id: "",
@@ -32,7 +34,9 @@ const Manager = () => {
   useEffect(() => {
     getData();
   }, []);
-
+  const [isloading,setIsLoading]= useState(false);
+  const [isGenerating,setIsGenerating]= useState(false);
+  const [isGenerated,setIsGenerated]= useState(false);
   const copyText = (text) => {
     toast.success("Copied to Clipboard!", {
       position: "top-right",
@@ -119,14 +123,20 @@ const Manager = () => {
       return;
     }
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
+    setIsLoading(true);
+    let strengthData = { strength: "strong" };
+    if(!isGenerated){
     const strengthRes = await fetch(`${API_URL}/api/passwords`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ password: form.password }),
-    });
-    const strengthData = await strengthRes.json();
+      
+      });
+      strengthData = await strengthRes.json();
+    }
+    setIsGenerated(false);
+    
     const entry = form.id ? form : { ...form, id: uuidv4(),strength:strengthData.strength };
     if (form.id) {
       // Update existing
@@ -147,7 +157,7 @@ const Manager = () => {
     }
     // Update UI
     setloginData([...loginData.filter((e) => e.id !== entry.id), entry]);
-    
+    setIsLoading(false);
     setform({ site: "", username: "", password: "" });
       // Clear form
   };
@@ -186,6 +196,8 @@ const Manager = () => {
   };
 
   const generatePassword = async () => {
+    setIsGenerating(true);
+    setIsGenerated(true);
     if (form.site == "" || form.username == "") {
       toast.error("Please fill all the fields!", {
         position: "top-right",
@@ -218,6 +230,7 @@ const Manager = () => {
    const res = await  fetch(`${API_URL}/generatePassword`, { method: "GET" })
       const data = await res.json();
         setform({...form, password: data.password});
+        setIsGenerating(false);
     }catch(error){
       toast.error("Error generating passwoord. Please try again later!", {
         position: "top-right",
@@ -253,200 +266,241 @@ const Manager = () => {
           <span className="text-blue-500">Bank/&gt;</span>
         </h1>
         <p className="text-white text text-center text-lg">
-          Secure password manager
+          Secure password manager & document storage
         </p>
-        <div className="text-white flex flex-col p-4 gap-8 items-center">
-          <input
-            className="bg-slate-800 rounded-full border border-blue-500 w-full px-4 py-1"
-            onChange={handleChange}
-            type="url"
-            value={form.site}
-            name="site"
-            id=""
-            placeholder="Enter website URL"
-          />
-          <div className="flex w-full gap-8">
+
+         
+        <div className="flex justify-center mb-8 py-5">
+          <div className="bg-slate-800 rounded-full p-1 flex">
+            <button
+              onClick={() => setActiveTab('passwords')}
+              className={`px-6 py-2 rounded-full transition-all duration-200 ${
+                activeTab === 'passwords'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              Passwords
+            </button>
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`px-6 py-2 rounded-full transition-all duration-200 ${
+                activeTab === 'documents'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              Documents
+            </button>
+          </div>
+        </div>
+        {/* Conditional content based on active tab */}
+        {activeTab === 'passwords' && (
+          <div className="text-white flex flex-col p-4 gap-8 items-center">
             <input
               className="bg-slate-800 rounded-full border border-blue-500 w-full px-4 py-1"
               onChange={handleChange}
-              type="text"
-              value={form.username}
-              name="username"
+              type="url"
+              value={form.site}
+              name="site"
               id=""
-              placeholder="Enter username"
+              placeholder="Enter website URL"
             />
-            <div className="relative">
+            <div className="flex w-full gap-8">
               <input
-                ref={passwordRef}
                 className="bg-slate-800 rounded-full border border-blue-500 w-full px-4 py-1"
                 onChange={handleChange}
-                type="password"
-                value={form.password}
-                name="password"
+                type="text"
+                value={form.username}
+                name="username"
                 id=""
-                placeholder="Enter password"
+                placeholder="Enter username"
               />
-              <span
-                className="absolute right-[3px] top-[4px] rounded-full w-fit cursor-pointer"
-                onClick={showPassword}
-              >
-                <img
-                  ref={ref}
-                  className="p-1 bg-slate-800 rounded-full"
-                  width={26}
-                  src="eye.png"
-                  alt=""
+              <div className="relative">
+                <input
+                  ref={passwordRef}
+                  className="bg-slate-800 rounded-full border border-blue-500 w-full px-4 py-1"
+                  onChange={handleChange}
+                  type="password"
+                  value={form.password}
+                  name="password"
+                  id=""
+                  placeholder="Enter password"
                 />
-              </span>
+                <span
+                  className="absolute right-[3px] top-[4px] rounded-full w-fit cursor-pointer"
+                  onClick={showPassword}
+                >
+                  <img
+                    ref={ref}
+                    className="p-1 bg-slate-800 rounded-full"
+                    width={26}
+                    src="eye.png"
+                    alt=""
+                  />
+                </span>
+              </div>
             </div>
+           <div className="flex gap-4">
+             <button
+              className="flex justify-center gap-2 items-center bg-blue-500 px-3 py-3 rounded-full w-fit hover:bg-blue-300 cursor-pointer"
+              onClick={savePassword}
+            >
+              {isloading? <p>Adding Login...</p> : <><lord-icon
+                src={LORDICON_ADD}
+                colors="primary:#ffffff"
+                trigger="hover"
+              ></lord-icon>
+              <p>Add Login</p></>}
+              
+            </button>
+            <button
+              className="flex justify-center gap-2 items-center bg-green-600 px-3 py-3 rounded-full w-fit hover:bg-green-400 cursor-pointer"
+              onClick={generatePassword}
+            >
+             {isGenerating? <p>Generating...</p> : <> <lord-icon
+                src={LORDICON_ADD}
+                colors="primary:#ffffff"
+                trigger="hover"
+              ></lord-icon>
+              Generate Password
+            </>}
+            </button>
+           </div>
           </div>
-         <div className="flex gap-4">
-           <button
-            className="flex justify-center gap-2 items-center bg-blue-500 px-3 py-3 rounded-full w-fit hover:bg-blue-300 cursor-pointer"
-            onClick={savePassword}
-          >
-            <lord-icon
-              src={LORDICON_ADD}
-              colors="primary:#ffffff"
-              trigger="hover"
-            ></lord-icon>
-            Add Login
-          </button>
-          <button
-            className="flex justify-center gap-2 items-center bg-green-600 px-3 py-3 rounded-full w-fit hover:bg-green-400 cursor-pointer"
-            onClick={generatePassword}
-          >
-            <lord-icon
-              src={LORDICON_ADD}
-              colors="primary:#ffffff"
-              trigger="hover"
-            ></lord-icon>
-            Generate Password
-          </button>
-         </div>
-        </div>
-        {!loginData.length ? (
-          <h2 className="text-center py-3 text-white">No Saved Passwords</h2>
-        ) : (
-          <div className="passwords">
-            <h2 className="text-white font-bold text-xl py-3">
-              Your Passwords
-            </h2>
-            
-            <div className="max-h-90 rounded-md no-scrollbar overflow-y-auto">
-              <table className="table-auto w-full rounded-md">
-                <thead className=" bg-blue-800 text-white sticky top-0  z-10">
-                  <tr>
-                    <th>Site</th>
-                    <th>Username</th>
-                    <th>Password</th>
-                    <th>Strength</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-blue-900/10 text-white">
-                  {loginData.map((item, index) => {
-                    return (
-                      <tr key={index}>
-                        <td className="py-2 text-center ">
-                          <div className="flex items-center justify-center">
-                            <a href={item.site}>{item.site}</a>
-                            <div
-                              className="loridconcpy size-7 cursor-pointer"
-                              onClick={() => {
-                                copyText(item.site);
-                              }}
-                            >
-                              <lord-icon
-                                className="edit"
-                                src={LORDICON_COPY}
-                                trigger="hover"
-                                colors="primary:#ffffff,secondary:#ffffff"
-                              ></lord-icon>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2 text-center ">
-                          <div className="flex items-center justify-center">
-                            <a href={item.site}>{item.username}</a>
-                            <div
-                              className="loridconcpy size-7 cursor-pointer"
-                              onClick={() => {
-                                copyText(item.username);
-                              }}
-                            >
-                              <lord-icon
-                                className="edit"
-                                src={LORDICON_COPY}
-                                trigger="hover"
-                                colors="primary:#ffffff,secondary:#ffffff"
-                              ></lord-icon>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2 text-center ">
-                          <div className="flex items-center justify-center">
-                            <a href={item.site}>{item.password}</a>
-                            <div
-                              className="loridconcpy size-7 cursor-pointer"
-                              onClick={() => {
-                                copyText(item.password);
-                              }}
-                            >
-                              <lord-icon
-                                className="edit"
-                                src={LORDICON_COPY}
-                                trigger="hover"
-                                colors="primary:#ffffff,secondary:#ffffff"
-                              ></lord-icon>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2 text-center">
-                          <div className="flex items-center justify-center">
-                            <a href={item.site}>{item.strength}</a>
-                          </div>
-                        </td>
-                        <td className="py-2 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <div>
-                              <button
-                                className="cursor-pointer"
-                                onClick={() => {
-                                  deletePassword(index);
-                                }}
-                              >
-                                <lord-icon
-                                  className="delete"
-                                  src={LORDICON_DELETE}
-                                  trigger="hover"
-                                  colors="primary:#ffffff"
-                                ></lord-icon>
-                              </button>
-                            </div>
-                            <div>
-                              <button
-                                className="cursor-pointer"
-                                onClick={() => {
-                                  editPassword(index);
-                                }}
-                              >
-                                <lord-icon
-                                  className="editIcon"
-                                  src={LORDICON_EDIT}
-                                  trigger="hover"
-                                  colors="primary:#ffffff,secondary:#ffffff"
-                                ></lord-icon>
-                              </button>
-                            </div>
-                          </div>
-                        </td>
+        )}
+        {activeTab === 'passwords' && (
+          <>
+            {!loginData.length ? (
+              <h2 className="text-center py-3 text-white">No Saved Passwords</h2>
+            ) : (
+              <div className="passwords">
+                <h2 className="text-white font-bold text-xl py-3">
+                  Your Passwords
+                </h2>
+                
+                <div className="max-h-90 rounded-md no-scrollbar overflow-y-auto">
+                  <table className="table-auto w-full rounded-md">
+                    <thead className=" bg-blue-800 text-white sticky top-0  z-10">
+                      <tr>
+                        <th>Site</th>
+                        <th>Username</th>
+                        <th>Password</th>
+                        <th>Strength</th>
+                        <th>Actions</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody className="bg-blue-900/10 text-white">
+                      {loginData.map((item, index) => {
+                        return (
+                          <tr key={index}>
+                            <td className="py-2 text-center ">
+                              <div className="flex items-center justify-center">
+                                <a href={item.site}>{item.site}</a>
+                                <div
+                                  className="loridconcpy size-7 cursor-pointer"
+                                  onClick={() => {
+                                    copyText(item.site);
+                                  }}
+                                >
+                                  <lord-icon
+                                    className="edit"
+                                    src={LORDICON_COPY}
+                                    trigger="hover"
+                                    colors="primary:#ffffff,secondary:#ffffff"
+                                  ></lord-icon>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-2 text-center ">
+                              <div className="flex items-center justify-center">
+                                <a href={item.site}>{item.username}</a>
+                                <div
+                                  className="loridconcpy size-7 cursor-pointer"
+                                  onClick={() => {
+                                    copyText(item.username);
+                                  }}
+                                >
+                                  <lord-icon
+                                    className="edit"
+                                    src={LORDICON_COPY}
+                                    trigger="hover"
+                                    colors="primary:#ffffff,secondary:#ffffff"
+                                  ></lord-icon>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-2 text-center ">
+                              <div className="flex items-center justify-center">
+                                <a href={item.site}>{item.password}</a>
+                                <div
+                                  className="loridconcpy size-7 cursor-pointer"
+                                  onClick={() => {
+                                    copyText(item.password);
+                                  }}
+                                >
+                                  <lord-icon
+                                    className="edit"
+                                    src={LORDICON_COPY}
+                                    trigger="hover"
+                                    colors="primary:#ffffff,secondary:#ffffff"
+                                  ></lord-icon>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-2 text-center">
+                              <div className="flex items-center justify-center">
+                                <a href={item.site}>{item.strength}</a>
+                              </div>
+                            </td>
+                            <td className="py-2 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <div>
+                                  <button
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                      deletePassword(index);
+                                    }}
+                                  >
+                                    <lord-icon
+                                      className="delete"
+                                      src={LORDICON_DELETE}
+                                      trigger="hover"
+                                      colors="primary:#ffffff"
+                                    ></lord-icon>
+                                  </button>
+                                </div>
+                                <div>
+                                  <button
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                      editPassword(index);
+                                    }}
+                                  >
+                                    <lord-icon
+                                      className="editIcon"
+                                      src={LORDICON_EDIT}
+                                      trigger="hover"
+                                      colors="primary:#ffffff,secondary:#ffffff"
+                                    ></lord-icon>
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'documents' && (
+          <div className="p-4">
+            <DocumentUpload />
           </div>
         )}
       </div>

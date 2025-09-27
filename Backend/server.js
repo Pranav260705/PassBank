@@ -1,12 +1,18 @@
 const express = require('express')
 const app = express()
-const { MongoClient } = require('mongodb')
+const { MongoClient, ObjectId } = require('mongodb')
 const dotenv = require('dotenv')
 const cors = require('cors')
 const bodyparser = require('body-parser')
 const session = require('express-session')
 const passport = require('passport')
 const GoogleStrategy = require('passport-google-oauth20').Strategy
+const multer = require('multer')
+const multerS3 = require('multer-s3')
+const { S3Client, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3')
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
+const path = require('path')
+const fs = require('fs')
 const port = process.env.PORT || 3000
 const axios = require('axios');
 
@@ -29,6 +35,52 @@ dotenv.config()
 
 app.use(bodyparser.json())
 app.set('trust proxy', 1);
+
+// Configure AWS S3 Client
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  }
+});
+
+// Configure multer for S3 uploads
+const upload = multer({
+  storage: multerS3({
+    s3: s3Client,
+    bucket: process.env.S3_BUCKET_NAME,
+    acl: 'private', // Make files private by default
+    key: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const userId = req.user ? req.user.googleId : 'anonymous';
+      const filename = `${userId}/${uniqueSuffix}${path.extname(file.originalname)}`;
+      cb(null, filename);
+    },
+    metadata: function (req, file, cb) {
+      cb(null, {
+        originalName: file.originalname,
+        userId: req.user ? req.user.googleId : 'anonymous',
+        uploadDate: new Date().toISOString()
+      });
+    }
+  }),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow common document types
+    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|rtf|odt|zip|rar|7z/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only images, documents, and archives are allowed.'));
+    }
+  }
+});
 
 // Session configuration
 app.use(session({
@@ -288,6 +340,116 @@ app.get('/generatePassword', async (req, res) => {
     res.status(500).json({ error: 'Failed to generate password' });
   }
 })
+
+// Document upload endpoints
+app.get('/api/documents', isAuthenticated, async (req, res) => {
+  try {
+    const collection = db.collection('documents');
+    const documents = await collection.find({ userId: req.user.googleId }).toArray();
+    res.json(documents);
+  } catch (error) {
+    console.error('Error fetching documents:', error);
+    res.status(500).json({ error: 'Failed to fetch documents' });
+  }
+});
+
+app.post('/api/documents/upload', isAuthenticated, upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const documentData = {
+      userId: req.user.googleId,
+      originalName: req.file.originalname,
+      s3Key: req.file.key, // S3 object key
+      s3Url: req.file.location, // S3 URL
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      uploadDate: new Date(),
+      description: req.body.description || '',
+      bucket: req.file.bucket
+    };
+
+    const collection = db.collection('documents');
+    const result = await collection.insertOne(documentData);
+    
+    res.json({ 
+      success: true, 
+      document: { 
+        ...documentData, 
+        _id: result.insertedId 
+      } 
+    });
+  } catch (error) {
+    console.error('Error uploading document:', error);
+    res.status(500).json({ error: 'Failed to upload document' });
+  }
+});
+
+app.get('/api/documents/download/:id', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const collection = db.collection('documents');
+    const document = await collection.findOne({ _id: new ObjectId(id), userId: req.user.googleId });
+    
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Generate a signed URL for S3 object download (valid for 1 hour)
+    const command = new GetObjectCommand({
+      Bucket: document.bucket || process.env.S3_BUCKET_NAME,
+      Key: document.s3Key,
+      ResponseContentDisposition: `attachment; filename="${document.originalName}"`
+    });
+
+    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    
+    // Return the signed URL as JSON instead of redirecting
+    res.json({ 
+      success: true, 
+      downloadUrl: signedUrl,
+      filename: document.originalName 
+    });
+  } catch (error) {
+    console.error('Error downloading document:', error);
+    res.status(500).json({ error: 'Failed to download document' });
+  }
+});
+
+app.delete('/api/documents/:id', isAuthenticated, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const collection = db.collection('documents');
+    const document = await collection.findOne({ _id: new ObjectId(id), userId: req.user.googleId });
+    
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Delete file from S3
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: document.bucket || process.env.S3_BUCKET_NAME,
+      Key: document.s3Key
+    });
+
+    try {
+      await s3Client.send(deleteCommand);
+    } catch (s3Error) {
+      console.error('Error deleting from S3:', s3Error);
+      // Continue with database deletion even if S3 deletion fails
+    }
+
+    // Delete from database
+    await collection.deleteOne({ _id: new ObjectId(id) });
+    
+    res.json({ success: true, message: 'Document deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    res.status(500).json({ error: 'Failed to delete document' });
+  }
+});
 
 app.post('/api/passwords', async (req, res) => {
  
