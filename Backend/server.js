@@ -8,6 +8,9 @@ const session = require('express-session')
 const passport = require('passport')
 const GoogleStrategy = require('passport-google-oauth20').Strategy
 const port = process.env.PORT || 3000
+const axios = require('axios');
+
+
 
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -35,7 +38,7 @@ app.use(session({
   name: 'passbank-session',
   cookie: {
     secure: process.env.NODE_ENV === 'production', // true in production (HTTPS)
-    maxAge: 24 * 60 * 60 * 1000,
+    maxAge: 12*24 * 60 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     httpOnly: true,
     path: '/'
@@ -210,21 +213,6 @@ app.get('/auth/user', (req, res) => {
   }
 });
 
-// Test endpoint to check session functionality
-app.get('/auth/test-session', (req, res) => {
-  
-  if (!req.session.testCount) {
-    req.session.testCount = 1;
-  } else {
-    req.session.testCount++;
-  }
-  
-  res.json({ 
-    sessionId: req.sessionID,
-    testCount: req.session.testCount,
-    cookies: req.headers.cookie
-  });
-});
 
 // Protected route middleware
 const isAuthenticated = (req, res, next) => {
@@ -277,6 +265,47 @@ app.put('/api/logins/:id', isAuthenticated, async (req, res) => {
   );
   res.send({ success: true, result });
 });
+
+
+async function generatePassword() {
+  const url = `https://api.api-ninjas.com/v1/passwordgenerator?length=12`;
+  const resp = await fetch(url, {
+    headers: { "X-Api-Key": process.env.API_NINJAS_KEY }
+  });
+
+  if (!resp.ok) {
+    throw new Error(`API request failed: ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  return data.random_password;
+}
+app.get('/generatePassword', async (req, res) => {
+  try{
+    const password = await generatePassword();
+    res.json({ password });
+  }catch(error){
+    res.status(500).json({ error: 'Failed to generate password' });
+  }
+})
+
+app.post('/api/passwords', async (req, res) => {
+ 
+    const password = req.body;
+    if (!password) {
+    return res.status(400).json({ success: false, message: "Password is required" });
+    }
+    try{
+      const fastapiUrl = process.env.FASTAPI_URL;
+      const response = await axios.post(fastapiUrl, password );
+      const label = response.data.label;
+      res.json({ success: true, strength: label });
+
+    }catch(error){
+      console.error('Error predicting password strength:', error.message);
+    res.status(500).json({ success: false, message: "Failed to predict password strength" });
+    }
+})
 
 // Start server
 app.listen(port, () => {

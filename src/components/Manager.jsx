@@ -90,7 +90,8 @@ const Manager = () => {
         theme: "dark",
       });
       return;
-    } else if (!isValidURL(form.site)) {
+    } 
+    if (!isValidURL(form.site)) {
       toast.error("Please enter a valid URL!", {
         position: "top-right",
         autoClose: 5000,
@@ -103,12 +104,30 @@ const Manager = () => {
       });
       return;
     }
-    const entry = form.id ? form : { ...form, id: uuidv4() };
-
-    // Update UI
-    setloginData([...loginData.filter((e) => e.id !== entry.id), entry]);
-
+    if(loginData.filter(e => e.site === form.site && e.id !== form.id).length > 0) {
+      toast.error("This site already exists!", {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: true,
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+      // return editPassword(loginData.findIndex(e => e.site === form.site && e.id !== form.id));
+      return;
+    }
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+    const strengthRes = await fetch(`${API_URL}/api/passwords`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ password: form.password }),
+    });
+    const strengthData = await strengthRes.json();
+    const entry = form.id ? form : { ...form, id: uuidv4(),strength:strengthData.strength };
     if (form.id) {
       // Update existing
       await fetch(`${API_URL}/api/logins/${entry.id}`, {
@@ -126,8 +145,11 @@ const Manager = () => {
         body: JSON.stringify([entry]),
       });
     }
-
-    setform({ site: "", username: "", password: "" }); // Clear form
+    // Update UI
+    setloginData([...loginData.filter((e) => e.id !== entry.id), entry]);
+    
+    setform({ site: "", username: "", password: "" });
+      // Clear form
   };
 
   const deletePassword = async (index) => {
@@ -163,6 +185,52 @@ const Manager = () => {
     setform({ ...form, [e.target.name]: e.target.value });
   };
 
+  const generatePassword = async () => {
+    if (form.site == "" || form.username == "") {
+      toast.error("Please fill all the fields!", {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: true,
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+      return;
+    } 
+    if (!isValidURL(form.site)) {
+      toast.error("Please enter a valid URL!", {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: true,
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+      return;
+    }
+
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    try{
+   const res = await  fetch(`${API_URL}/generatePassword`, { method: "GET" })
+      const data = await res.json();
+        setform({...form, password: data.password});
+    }catch(error){
+      toast.error("Error generating passwoord. Please try again later!", {
+        position: "top-right",
+        autoClose: 5000,
+        hideProgressBar: true,
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "dark",
+      });
+  }
+  };
   return (
     <>
       <ToastContainer
@@ -232,7 +300,8 @@ const Manager = () => {
               </span>
             </div>
           </div>
-          <button
+         <div className="flex gap-4">
+           <button
             className="flex justify-center gap-2 items-center bg-blue-500 px-3 py-3 rounded-full w-fit hover:bg-blue-300 cursor-pointer"
             onClick={savePassword}
           >
@@ -243,6 +312,18 @@ const Manager = () => {
             ></lord-icon>
             Add Login
           </button>
+          <button
+            className="flex justify-center gap-2 items-center bg-green-600 px-3 py-3 rounded-full w-fit hover:bg-green-400 cursor-pointer"
+            onClick={generatePassword}
+          >
+            <lord-icon
+              src={LORDICON_ADD}
+              colors="primary:#ffffff"
+              trigger="hover"
+            ></lord-icon>
+            Generate Password
+          </button>
+         </div>
         </div>
         {!loginData.length ? (
           <h2 className="text-center py-3 text-white">No Saved Passwords</h2>
@@ -259,6 +340,7 @@ const Manager = () => {
                     <th>Site</th>
                     <th>Username</th>
                     <th>Password</th>
+                    <th>Strength</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -318,6 +400,11 @@ const Manager = () => {
                                 colors="primary:#ffffff,secondary:#ffffff"
                               ></lord-icon>
                             </div>
+                          </div>
+                        </td>
+                        <td className="py-2 text-center">
+                          <div className="flex items-center justify-center">
+                            <a href={item.site}>{item.strength}</a>
                           </div>
                         </td>
                         <td className="py-2 text-center">
