@@ -149,7 +149,10 @@ const Manager = () => {
     }
     setIsGenerated(false);
     
-    const entry = form.id ? form : { ...form, id: uuidv4(),strength:strengthData.strength };
+    const entry = form.id
+  ? { ...form, strength: strengthData.strength }
+  : { ...form, id: uuidv4(), strength: strengthData.strength };
+
     const headers = { "Content-Type": "application/json" };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     
@@ -206,8 +209,7 @@ const Manager = () => {
       password: item.password,
       id: item.id, // retain original id
     });
-
-    deletePassword(index); // then re-add on save
+    // then re-add on save
   };
 
   const handleChange = (e) => {
@@ -215,8 +217,6 @@ const Manager = () => {
   };
 
   const generatePassword = async () => {
-    setIsGenerating(true);
-    setIsGenerated(true);
     if (form.site == "" || form.username == "") {
       toast.error("Please fill all the fields!", {
         position: "top-right",
@@ -243,6 +243,10 @@ const Manager = () => {
       });
       return;
     }
+    
+    setIsGenerating(true);
+    setIsGenerated(true);
+    
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     try{
