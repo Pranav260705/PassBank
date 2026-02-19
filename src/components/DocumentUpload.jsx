@@ -18,11 +18,19 @@ const DocumentUpload = () => {
 
   const fetchDocuments = async () => {
     try {
+      const token = localStorage.getItem('authToken');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch(`${API_URL}/api/documents`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers
       });
       const data = await response.json();
-      setDocuments(data);
+      if (Array.isArray(data)) {
+        setDocuments(data);
+      } else {
+        setDocuments([]);
+      }
     } catch (error) {
       console.error('Error fetching documents:', error);
       toast.error('Failed to fetch documents', {
@@ -80,9 +88,13 @@ const DocumentUpload = () => {
     formData.append('description', description);
 
     try {
+      const token = localStorage.getItem('authToken');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch(`${API_URL}/api/documents/upload`, {
         method: 'POST',
         credentials: 'include',
+        headers,
         body: formData
       });
 
@@ -134,9 +146,13 @@ const DocumentUpload = () => {
 
   const handleDownload = async (document) => {
     try {
+      const token = localStorage.getItem('authToken');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       // Get the signed download URL from backend
       const response = await fetch(`${API_URL}/api/documents/download/${document._id}`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers
       });
 
       if (response.ok) {
@@ -184,9 +200,13 @@ const DocumentUpload = () => {
     }
 
     try {
+      const token = localStorage.getItem('authToken');
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch(`${API_URL}/api/documents/${documentId}`, {
         method: 'DELETE',
-        credentials: 'include'
+        credentials: 'include',
+        headers
       });
 
       const data = await response.json();

@@ -18,16 +18,37 @@ const axios = require('axios');
 
 
 
+
+dotenv.config()
+
+
+const normalizedClientUrl = (process.env.CLIENT_URL || '').replace(/\/+$/, '');
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  normalizedClientUrl
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/+$/, '');
+    // Check if origin is in allowed list (exact or prefix match)
+    const isAllowed = allowedOrigins.some(allowed => 
+      normalizedOrigin === allowed || normalizedOrigin.startsWith(allowed)
+    );
+    if (isAllowed) {
+      // Reflect the exact requesting origin to avoid mismatch
+      return callback(null, origin);
+    }
+    return callback(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   exposedHeaders: ['Set-Cookie']
 }));
-
-// Load environment variables
-dotenv.config()
 
 // Basic middleware
 
@@ -89,9 +110,9 @@ app.use(session({
   saveUninitialized: false,
   name: 'passbank-session',
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // true in production (HTTPS)
+    secure: false, // Set to false for HTTP (S3 static sites use HTTP)
     maxAge: 12*24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    sameSite: 'lax', // Use 'lax' for HTTP, 'none' requires HTTPS
     httpOnly: true,
     path: '/'
   }
@@ -104,18 +125,33 @@ app.use(passport.session())
 
 // MongoDB connection
 const url = process.env.MONGO_URL
-const client = new MongoClient(url);
+if (!url) {
+    console.error('ERROR: MONGO_URL environment variable is not set!');
+    console.error('Please set MONGO_URL in Elastic Beanstalk environment variables');
+}
+
+let client;
 let db;
 
 async function connectDB() {
     try {
+        if (!url) {
+            console.error('Cannot connect: MONGO_URL is missing');
+            return null;
+        }
+        
+        // Connect to MongoDB using URL as-is (Atlas-friendly)
+        const mongoUrl = url;
+        console.log('Connecting to MongoDB (no custom CA override)...');
+        client = new MongoClient(mongoUrl, { serverSelectionTimeoutMS: 20000 });
         await client.connect();
-        console.log('Connected successfully to MongoDB');
+        console.log('✅ Connected successfully to MongoDB');
         db = client.db("PassBank");
-        console.log('Database initialized');
+        console.log('✅ Database "PassBank" initialized');
         return 'done.';
     } catch (error) {
-        console.error('MongoDB connection error:', error);
+        console.error('❌ MongoDB connection error:', error.message);
+        console.error('Full error:', error);
         return null;
     }
 }
@@ -156,24 +192,47 @@ passport.use(new GoogleStrategy({
   async (accessToken, refreshToken, profile, done) => {
     try {
       if (!db) {
+        console.error('OAuth: Database not initialized');
         return done(new Error('Database not initialized'), null);
       }
+
+      if (!profile || !profile.id) {
+        console.error('OAuth: Invalid profile received');
+        return done(new Error('Invalid profile'), null);
+      }
+
       const collection = db.collection('users');
       let user = await collection.findOne({ googleId: profile.id });
       
       if (!user) {
+        // Create new user
+        if (!profile.emails || !profile.emails[0]) {
+          console.error('OAuth: No email in profile');
+          return done(new Error('Email required'), null);
+        }
+
         user = {
           googleId: profile.id,
           email: profile.emails[0].value,
-          name: profile.displayName,
-          picture: profile.photos[0].value,
+          name: profile.displayName || 'User',
+          picture: profile.photos && profile.photos[0] ? profile.photos[0].value : '',
           createdAt: new Date()
         };
-        await collection.insertOne(user);
+        
+        try {
+          await collection.insertOne(user);
+          console.log('OAuth: New user created:', user.email);
+        } catch (insertError) {
+          console.error('OAuth: Error inserting user:', insertError);
+          return done(insertError, null);
+        }
+      } else {
+        console.log('OAuth: Existing user found:', user.email);
       }
       
       return done(null, user);
     } catch (error) {
+      console.error('OAuth Strategy error:', error);
       return done(error, null);
     }
   }
@@ -188,9 +247,12 @@ app.get('/auth/google', (req, res, next) => {
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
-    
-    
-    if (req.user) {
+    try {
+      if (!req.user) {
+        console.error('OAuth callback: No user in request');
+        return res.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
+      }
+
       // Create a simple token (in production, use JWT)
       const token = Buffer.from(req.user.googleId + ':' + Date.now()).toString('base64');
       
@@ -198,12 +260,17 @@ app.get('/auth/google/callback',
       req.session.authToken = token;
       req.session.userId = req.user.googleId;
       
+      // Get CLIENT_URL (fallback to default if not set)
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
       
       // Redirect with token as URL parameter
-      const redirectUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}?token=${token}`;
+      const redirectUrl = `${clientUrl}?token=${token}`;
       res.redirect(redirectUrl);
-    } else {
-      res.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
+    } catch (error) {
+      console.error('OAuth callback error:', error);
+      // Redirect to frontend with error parameter
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      res.redirect(`${clientUrl}?error=oauth_failed`);
     }
   }
 );
@@ -217,48 +284,78 @@ app.get('/auth/logout', (req, res) => {
   });
 });
 
-app.get('/auth/user', (req, res) => {
-  
-  // Check for token in Authorization header
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-    
-    // Validate token against session
-    if (req.session.authToken === token && req.session.userId) {
-      // Find user by userId
-      const collection = db.collection('users');
-      collection.findOne({ googleId: req.session.userId }).then(user => {
-        if (user) {
-          res.json({ 
-            user: user,
-            isAuthenticated: true 
-          });
-        } else {
-          res.json({ 
+app.get('/auth/user', async (req, res) => {
+  try {
+    // Check for token in Authorization header
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      
+      try {
+        // Decode token (format: base64(googleId:timestamp))
+        const decoded = Buffer.from(token, 'base64').toString('utf-8');
+        const [googleId, timestamp] = decoded.split(':');
+        
+        // Validate timestamp (token should be recent, e.g., within 30 days)
+        const tokenAge = Date.now() - parseInt(timestamp);
+        const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+        
+        if (tokenAge > maxAge || tokenAge < 0) {
+          console.log('Token expired or invalid timestamp');
+          return res.json({ 
             user: null,
             isAuthenticated: false 
           });
         }
-      }).catch(err => {
-        console.error('Error finding user:', err);
-        res.json({ 
-          user: null,
-          isAuthenticated: false 
-        });
-      });
-      return;
+        
+        // Find user by googleId from token
+        if (!db) {
+          console.error('Database not initialized');
+          return res.json({ 
+            user: null,
+            isAuthenticated: false 
+          });
+        }
+        
+        const collection = db.collection('users');
+        const user = await collection.findOne({ googleId: googleId });
+        
+        if (user) {
+          // Also update session for session-based routes
+          req.session.authToken = token;
+          req.session.userId = googleId;
+          
+          return res.json({ 
+            user: user,
+            isAuthenticated: true 
+          });
+        } else {
+          return res.json({ 
+            user: null,
+            isAuthenticated: false 
+          });
+        }
+      } catch (decodeError) {
+        console.error('Error decoding token:', decodeError);
+        // Fall through to session check
+      }
     }
-  }
-  
-  // Fallback to session-based auth
-  if (req.isAuthenticated()) {
-    res.json({ 
-      user: req.user,
-      isAuthenticated: true 
-    });
-  } else {
-    res.json({ 
+    
+    // Fallback to session-based auth
+    if (req.isAuthenticated()) {
+      return res.json({ 
+        user: req.user,
+        isAuthenticated: true 
+      });
+    } else {
+      return res.json({ 
+        user: null,
+        isAuthenticated: false 
+      });
+    }
+  } catch (error) {
+    console.error('Error in /auth/user:', error);
+    return res.json({ 
       user: null,
       isAuthenticated: false 
     });
@@ -267,10 +364,55 @@ app.get('/auth/user', (req, res) => {
 
 
 // Protected route middleware
-const isAuthenticated = (req, res, next) => {
+const isAuthenticated = async (req, res, next) => {
+  // First check session-based auth
   if (req.isAuthenticated()) {
     return next();
   }
+  
+  // If no session, check for token in Authorization header
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    
+    try {
+      // Decode token (format: base64(googleId:timestamp))
+      const decoded = Buffer.from(token, 'base64').toString('utf-8');
+      const [googleId, timestamp] = decoded.split(':');
+      
+      // Validate timestamp (token should be recent, e.g., within 30 days)
+      const tokenAge = Date.now() - parseInt(timestamp);
+      const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+      
+      if (tokenAge > maxAge || tokenAge < 0 || !googleId) {
+        return res.status(401).json({ error: 'Token expired or invalid' });
+      }
+      
+      // Find user by googleId from token
+      if (!db) {
+        return res.status(500).json({ error: 'Database not initialized' });
+      }
+      
+      const collection = db.collection('users');
+      const user = await collection.findOne({ googleId: googleId });
+      
+      if (user) {
+        // Set req.user so routes can access it
+        req.user = user;
+        // Also update session for consistency
+        req.session.authToken = token;
+        req.session.userId = googleId;
+        return next();
+      } else {
+        return res.status(401).json({ error: 'User not found' });
+      }
+    } catch (decodeError) {
+      console.error('Error decoding token in isAuthenticated:', decodeError);
+      return res.status(401).json({ error: 'Invalid token format' });
+    }
+  }
+  
+  // No valid authentication found
   res.status(401).json({ error: 'Not authenticated' });
 };
 
@@ -469,7 +611,36 @@ app.post('/api/passwords', async (req, res) => {
     }
 })
 
+// Test endpoint to check database connection
+app.get('/test/db', async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(500).json({ 
+        error: 'Database not initialized',
+        message: 'Check MONGO_URL environment variable and network access to MongoDB'
+      });
+    }
+    await db.admin().ping();
+    const collections = await db.listCollections().toArray();
+    res.json({ 
+      status: 'Database connected', 
+      db: db.databaseName,
+      collections: collections.map(c => c.name)
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Database connection failed',
+      message: error.message 
+    });
+  }
+});
+
 // Start server
 app.listen(port, () => {
     console.log(`Server listening on port ${port}`)
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`)
+    console.log(`CLIENT_URL: ${process.env.CLIENT_URL || 'Not set'}`)
+    console.log(`MONGO_URL: ${process.env.MONGO_URL ? 'Set ✅' : 'NOT SET ❌ - CRITICAL!'}`)
+    console.log(`GOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'Set ✅' : 'NOT SET ❌'}`)
+    console.log(`GOOGLE_CLIENT_SECRET: ${process.env.GOOGLE_CLIENT_SECRET ? 'Set ✅' : 'NOT SET ❌'}`)
 })

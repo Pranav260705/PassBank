@@ -21,12 +21,22 @@ const Manager = () => {
   });
   const getData = async () => {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const token = localStorage.getItem('authToken');
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     let req = await fetch(`${API_URL}/api/logins`, {
-      credentials: 'include'
+      credentials: 'include',
+      headers
     });
     let data = await req.json();
-    if (data) {
+    if (data && Array.isArray(data)) {
       setloginData(data);
+    } else {
+      setloginData([]);
     }
   };
 
@@ -123,26 +133,31 @@ const Manager = () => {
       return;
     }
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const token = localStorage.getItem('authToken');
     setIsLoading(true);
     let strengthData = { strength: "strong" };
     if(!isGenerated){
-    const strengthRes = await fetch(`${API_URL}/api/passwords`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ password: form.password }),
-      
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const strengthRes = await fetch(`${API_URL}/api/passwords`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ password: form.password }),
       });
       strengthData = await strengthRes.json();
     }
     setIsGenerated(false);
     
     const entry = form.id ? form : { ...form, id: uuidv4(),strength:strengthData.strength };
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    
     if (form.id) {
       // Update existing
       await fetch(`${API_URL}/api/logins/${entry.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: 'include',
         body: JSON.stringify(entry),
       });
@@ -150,7 +165,7 @@ const Manager = () => {
       // Insert new
       await fetch(`${API_URL}/api/logins`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: 'include',
         body: JSON.stringify([entry]),
       });
@@ -167,9 +182,13 @@ const Manager = () => {
 
     // Delete from server
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const token = localStorage.getItem('authToken');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     await fetch(`${API_URL}/api/logins/${item.id}`, {
       method: "DELETE",
       credentials: 'include',
+      headers
     });
 
     // Update local state
