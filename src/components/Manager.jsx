@@ -10,7 +10,7 @@ const LORDICON_EDIT = import.meta.env.VITE_LORDICON_EDIT;
 const Manager = () => {
   const ref = useRef();
   const passwordRef = useRef();
-
+  const [passwordGenerated, setPasswordGenerated] = useState(false);
   const [form, setform] = useState({
     id: "",
     site: "",
@@ -77,80 +77,108 @@ const Manager = () => {
     }
   }
 
-  const savePassword = async () => {
-    if (form.site == "" || form.username == "" || form.password == "") {
-      toast.error("Please fill all the fields!", {
-        position: "top-right",
-        autoClose: 5000,
-        hideProgressBar: true,
-        closeOnClick: false,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "dark",
-      });
-      return;
-    } 
-    if (!isValidURL(form.site)) {
-      toast.error("Please enter a valid URL!", {
-        position: "top-right",
-        autoClose: 5000,
-        hideProgressBar: true,
-        closeOnClick: false,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "dark",
-      });
-      return;
-    }
-    if(loginData.filter(e => e.site === form.site && e.id !== form.id).length > 0) {
-      toast.error("This site already exists!", {
-        position: "top-right",
-        autoClose: 5000,
-        hideProgressBar: true,
-        closeOnClick: false,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "dark",
-      });
-      // return editPassword(loginData.findIndex(e => e.site === form.site && e.id !== form.id));
-      return;
-    }
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-    const strengthRes = await fetch(`${API_URL}/api/passwords`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ password: form.password }),
-    });
-    const strengthData = await strengthRes.json();
-    const entry = form.id ? form : { ...form, id: uuidv4(),strength:strengthData.strength };
+const savePassword = async () => {
+  if (!form.site || !form.username || !form.password) {
+    toast.error("Please fill all the fields!");
+    return;
+  }
+
+  if (!isValidURL(form.site)) {
+    toast.error("Please enter a valid URL!");
+    return;
+  }
+
+  if (
+    loginData.some(
+      (e) => e.site === form.site && e.id !== form.id
+    )
+  ) {
+    toast.error("This site already exists!");
+    return;
+  }
+
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+  try {
+    let strength;
+
+    // Generated password: trust the generator and skip strength API.
+    if (passwordGenerated) {
+      strength = "Strong";
+    } else {
+      // Manually entered or modified password: check through API.
+      const strengthRes = await fetch(`${API_URL}/api/passwords`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password: form.password }),
+      });
+
+      if (!strengthRes.ok) {
+        throw new Error("Failed to check password strength");
+      }
+
+      const strengthData = await strengthRes.json();
+      strength = strengthData.strength;
+    }
+
+    const entry = {
+      ...form,
+      id: form.id || uuidv4(),
+      strength,
+    };
+
+    let response;
+
     if (form.id) {
-      // Update existing
-      await fetch(`${API_URL}/api/logins/${entry.id}`, {
+      // Update existing login without deleting it first.
+      response = await fetch(`${API_URL}/api/logins/${entry.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify(entry),
       });
     } else {
-      // Insert new
-      await fetch(`${API_URL}/api/logins`, {
+      // Create a new login.
+      response = await fetch(`${API_URL}/api/logins`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify([entry]),
       });
     }
-    // Update UI
-    setloginData([...loginData.filter((e) => e.id !== entry.id), entry]);
-    
-    setform({ site: "", username: "", password: "" });
-      // Clear form
-  };
+
+    if (!response.ok) {
+      throw new Error("Failed to save password");
+    }
+
+    // Keep the UI in sync with the saved entry.
+    setloginData((prev) => {
+      const exists = prev.some((item) => item.id === entry.id);
+
+      return exists
+        ? prev.map((item) =>
+            item.id === entry.id ? entry : item
+          )
+        : [...prev, entry];
+    });
+
+    setform({
+      id: "",
+      site: "",
+      username: "",
+      password: "",
+    });
+
+    setPasswordGenerated(false);
+    toast.success("Password saved successfully!");
+  } catch (error) {
+    console.error(error);
+    toast.error("Unable to save password. Please try again.");
+  }
+};
+
 
   const deletePassword = async (index) => {
     const item = loginData[index];
@@ -168,69 +196,77 @@ const Manager = () => {
     setloginData(newData);
   };
 
-  const editPassword = (index) => {
-    const item = loginData[index];
+ 
+const editPassword = (index) => {
+  const item = loginData[index];
 
-    setform({
-      site: item.site,
-      username: item.username,
-      password: item.password,
-      id: item.id, // retain original id
+  setform({
+    id: item.id,
+    site: item.site,
+    username: item.username,
+    password: item.password,
+    strength: item.strength,
+  });
+
+  // Existing passwords must be checked if they are saved again,
+  // unless the user generates a replacement.
+  setPasswordGenerated(false);
+};
+
+
+  
+const handleChange = (e) => {
+  const { name, value } = e.target;
+
+  setform((prev) => ({
+    ...prev,
+    [name]: value,
+  }));
+
+  if (name === "password") {
+    setPasswordGenerated(false);
+  }
+};
+
+
+  
+const generatePassword = async () => {
+  if (!form.site || !form.username) {
+    toast.error("Please fill all the fields!");
+    return;
+  }
+
+  if (!isValidURL(form.site)) {
+    toast.error("Please enter a valid URL!");
+    return;
+  }
+
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+  try {
+    const res = await fetch(`${API_URL}/generatePassword`, {
+      method: "GET",
     });
 
-    deletePassword(index); // then re-add on save
-  };
-
-  const handleChange = (e) => {
-    setform({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const generatePassword = async () => {
-    if (form.site == "" || form.username == "") {
-      toast.error("Please fill all the fields!", {
-        position: "top-right",
-        autoClose: 5000,
-        hideProgressBar: true,
-        closeOnClick: false,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "dark",
-      });
-      return;
-    } 
-    if (!isValidURL(form.site)) {
-      toast.error("Please enter a valid URL!", {
-        position: "top-right",
-        autoClose: 5000,
-        hideProgressBar: true,
-        closeOnClick: false,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "dark",
-      });
-      return;
+    if (!res.ok) {
+      throw new Error("Failed to generate password");
     }
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    try{
-   const res = await  fetch(`${API_URL}/generatePassword`, { method: "GET" })
-      const data = await res.json();
-        setform({...form, password: data.password});
-    }catch(error){
-      toast.error("Error generating passwoord. Please try again later!", {
-        position: "top-right",
-        autoClose: 5000,
-        hideProgressBar: true,
-        closeOnClick: false,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "dark",
-      });
+    const data = await res.json();
+
+    setform((prev) => ({
+      ...prev,
+      password: data.password,
+      strength: "Strong",
+    }));
+
+    setPasswordGenerated(true);
+  } catch (error) {
+    console.error(error);
+    toast.error("Error generating password. Please try again later!");
   }
-  };
+};
+
   return (
     <>
       <ToastContainer
